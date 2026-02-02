@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Hello TensorFlow.js</title>
+
+  <!-- TensorFlow JS Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+</head>
+
+<body>
+
+<h2>Hello TensorFlow.js Practical</h2>
+
+<p>Open Browser Console (Press F12) to see output.</p>
+
+<script>
+
+  // Step 1: Create Tensors
+  const tensorA = tf.tensor([1, 2, 3]);
+  const tensorB = tf.tensor([4, 5, 6]);
+
+  // Step 2: Add Tensors
+  const result = tf.add(tensorA, tensorB);
+
+  // Step 3: Print Results
+  console.log("Tensor A:");
+  tensorA.print();
+
+  console.log("Tensor B:");
+  tensorB.print();
+
+  console.log("Addition Result:");
+  result.print();
+
+</script>
+
+</body>
+</html>
