@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Learning Rate Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 p-4 md:p-10">
+
+    <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+        <div class="bg-slate-900 p-6 text-white flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold">Learning Rate Lab</h1>
+                <p class="text-slate-400 text-sm">Visualizing Gradient Descent Convergence</p>
+            </div>
+            <button onclick="startTraining()" id="trainBtn" class="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-lg font-semibold transition">
+                Run Models
+            </button>
+        </div>
+
+        <div class="p-6">
+            <div class="h-80 w-full">
+                <canvas id="convergenceChart"></canvas>
+            </div>
+        </div>
+
+        <div class="bg-slate-100 p-4 border-t border-slate-200 text-center">
+            <p class="text-slate-600 text-sm italic">
+                💡 Open <strong>Console (F12)</strong> to see the raw Loss values as they calculate!
+            </p>
+        </div>
+    </div>
+
+    <script>
+        let chart;
+
+        async function startTraining() {
+            const btn = document.getElementById('trainBtn');
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+
+            // 1. Setup Data: y = 2x
+            const xs = tf.tensor2d([1, 2, 3, 4], [4, 1]);
+            const ys = tf.tensor2d([2, 4, 6, 8], [4, 1]);
+
+            const scenarios = [
+                { lr: 0.001, label: 'Slow (0.001)', color: '#94a3b8' },
+                { lr: 0.1,   label: 'Fast (0.1)',   color: '#2563eb' },
+                { lr: 1.2,   label: 'Unstable (1.2)', color: '#dc2626' }
+            ];
+
+            const results = [];
+
+            console.clear();
+            console.log("%c--- STARTING TRAINING EXPERIMENT ---", "font-size: 16px; font-weight: bold; color: #2563eb;");
+
+            for (const item of scenarios) {
+                console.log(`\n%cTesting Rate: ${item.label}`, `color: ${item.color}; font-weight: bold;`);
+                
+                const model = tf.sequential();
+                model.add(tf.layers.dense({units: 1, inputShape: [1]}));
+                model.compile({optimizer: tf.train.sgd(item.lr), loss: 'meanSquaredError'});
+
+                const history = await model.fit(xs, ys, {
+                    epochs: 15,
+                    callbacks: {
+                        onEpochEnd: (epoch, logs) => {
+                            console.log(`Epoch ${epoch + 1}: Loss = ${logs.loss.toFixed(6)}`);
+                        }
+                    }
+                });
+
+                results.push({
+                    label: item.label,
+                    data: history.history.loss,
+                    borderColor: item.color,
+                    backgroundColor: item.color + '22',
+                    fill: true,
+                    tension: 0.4
+                });
+            }
+
+            updateChart(results);
+            btn.disabled = false;
+            btn.classList.remove('opacity-50');
+            console.log("\n%cExperiment Complete!", "color: green; font-weight: bold;");
+        }
+
+        function updateChart(datasets) {
+            const ctx = document.getElementById('convergenceChart').getContext('2d');
+            if (chart) chart.destroy();
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 15}, (_, i) => `Epoch ${i + 1}`),
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { 
+                            type: 'logarithmic',
+                            title: { display: true, text: 'Loss (Error Rate)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize empty chart
+        window.onload = () => updateChart([]);
+    </script>
+</body>
+</html>

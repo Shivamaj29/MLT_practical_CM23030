@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TensorFlow.js Regression</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #f4f4f4; }
+        canvas { max-width: 600px; margin: 20px auto; background: white; padding: 10px; border-radius: 8px; }
+        .status { color: #555; font-weight: bold; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>Regression Model</h1>
+    <div id="status" class="status">Generating data and training...</div>
+    <canvas id="regressionChart"></canvas>
+
+    <script>
+        async function runRegression() {
+            // 1. Create Synthetic Data (y = 2x - 1)
+            const xs = tf.tensor2d([-1, 0, 1, 2, 3, 4], [6, 1]);
+            const ys = tf.tensor2d([-3, -1, 1, 3, 5, 7], [6, 1]);
+
+            // 2. Define the Model
+            const model = tf.sequential();
+            model.add(tf.layers.dense({units: 1, inputShape: [1]}));
+
+            // 3. Compile the Model
+            model.compile({
+                loss: 'meanSquaredError',
+                optimizer: 'sgd'
+            });
+
+            // 4. Train the Model (500 iterations)
+            console.log("Training started...");
+            await model.fit(xs, ys, {epochs: 500});
+            document.getElementById('status').innerText = "Training Complete! Plotting results...";
+
+            // 5. Predict Values
+            const xPredict = [-1, 0, 1, 2, 3, 4];
+            const predictions = model.predict(tf.tensor2d(xPredict, [6, 1])).dataSync();
+
+            console.log("Actual ys:", ys.dataSync());
+            console.log("Predicted ys:", predictions);
+
+            // 6. Plotting
+            plotResults(xPredict, ys.dataSync(), predictions);
+        }
+
+        function plotResults(xLabels, actual, predicted) {
+            const ctx = document.getElementById('regressionChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: xLabels,
+                    datasets: [{
+                        label: 'Actual Values',
+                        data: actual,
+                        borderColor: 'blue',
+                        backgroundColor: 'transparent',
+                        pointRadius: 6,
+                        type: 'scatter'
+                    }, {
+                        label: 'Predicted Line',
+                        data: predicted,
+                        borderColor: 'red',
+                        borderWidth: 2,
+                        fill: false
+                    }]
+                }
+            });
+        }
+
+        runRegression();
+    </script>
+</body>
+</html>

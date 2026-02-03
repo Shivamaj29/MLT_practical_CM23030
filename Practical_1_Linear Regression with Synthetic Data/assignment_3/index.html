@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Prediction Testing Lab</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 p-6 md:p-12">
+
+    <div class="max-w-3xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="bg-indigo-700 p-6 text-white">
+            <h1 class="text-2xl font-bold">Unseen Data Testing</h1>
+            <p class="text-indigo-100 italic">Target Function: y = 2x</p>
+        </div>
+
+        <div class="p-8">
+            <div class="flex flex-col items-center justify-center space-y-4">
+                <button onclick="trainAndTest()" id="actionBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-full font-bold shadow-md transition-all active:scale-95">
+                    Train & Predict Unseen Data
+                </button>
+                <div id="status" class="text-slate-500 font-medium italic">Ready to begin...</div>
+            </div>
+
+            <div id="resultsTable" class="mt-10 hidden">
+                <h2 class="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Comparison Results</h2>
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-600 text-sm uppercase">
+                            <th class="p-3 border">Input (x)</th>
+                            <th class="p-3 border">Expected (y)</th>
+                            <th class="p-3 border">Model Prediction</th>
+                            <th class="p-3 border">Accuracy</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function trainAndTest() {
+            const btn = document.getElementById('actionBtn');
+            const status = document.getElementById('status');
+            const table = document.getElementById('resultsTable');
+            const tbody = document.getElementById('tableBody');
+
+            // Reset UI
+            btn.disabled = true;
+            tbody.innerHTML = "";
+            table.classList.add('hidden');
+            status.innerText = "Training on known data [1, 2, 3, 4]...";
+
+            // 1. Training Data (Known)
+            const trainX = tf.tensor2d([1, 2, 3, 4], [4, 1]);
+            const trainY = tf.tensor2d([2, 4, 6, 8], [4, 1]);
+
+            // 2. Build and Train Model
+            const model = tf.sequential();
+            model.add(tf.layers.dense({units: 1, inputShape: [1]}));
+            model.compile({optimizer: tf.train.sgd(0.1), loss: 'meanSquaredError'});
+            
+            await model.fit(trainX, trainY, {epochs: 100, verbose: 0});
+
+            // 3. Unseen Data (Testing)
+            const testInputs = [5, 10, 25, 100];
+            const expectedOutputs = testInputs.map(x => x * 2);
+
+            status.innerText = "Predicting unseen values...";
+            console.clear();
+            console.log("%c--- UNSEEN DATA PREDICTIONS ---", "color: #4338ca; font-weight: bold; font-size: 14px;");
+
+            // 4. Run Predictions
+            const inputTensor = tf.tensor2d(testInputs, [4, 1]);
+            const predictionTensor = model.predict(inputTensor);
+            const predictedValues = predictionTensor.dataSync();
+
+            // 5. Build UI and Log to Console
+            testInputs.forEach((x, i) => {
+                const pred = predictedValues[i].toFixed(2);
+                const exp = expectedOutputs[i];
+                const accuracy = (100 - Math.abs((exp - pred) / exp * 100)).toFixed(2);
+
+                console.log(`Input: ${x} | Expected: ${exp} | Predicted: ${pred} (Acc: ${accuracy}%)`);
+
+                const row = `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-3 border font-mono">${x}</td>
+                        <td class="p-3 border font-mono">${exp}</td>
+                        <td class="p-3 border font-mono text-indigo-600 font-bold">${pred}</td>
+                        <td class="p-3 border">
+                            <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">${accuracy}%</span>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+
+            table.classList.remove('hidden');
+            status.innerText = "Success! Model extrapolated the pattern.";
+            btn.disabled = false;
+        }
+    </script>
+</body>
+</html>

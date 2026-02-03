@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Architecture Comparison - Light Mode</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-white text-slate-800 p-6 md:p-12 font-sans">
+
+    <div class="max-w-5xl mx-auto">
+        <header class="mb-10 pb-6 border-b border-slate-200">
+            <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">MNIST Architecture Benchmark</h1>
+            <p class="text-slate-500 mt-1">Analyzing the efficiency of <strong>Dense (MLP)</strong> vs. <strong>Convolutional (CNN)</strong> networks.</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <div class="lg:col-span-1 space-y-6">
+                <div class="bg-slate-50 p-6 rounded-xl border border-slate-200">
+                    <button onclick="startTraining()" id="btn" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-sm transition-all active:scale-95">
+                        Run Comparison
+                    </button>
+                    <div id="status" class="mt-3 text-xs text-center text-slate-400 italic">Ready to train...</div>
+                </div>
+
+                <div class="border border-slate-200 rounded-xl overflow-hidden">
+                    <div class="bg-slate-50 px-4 py-2 border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-500">Live Accuracy</div>
+                    <div class="p-4 space-y-4">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-semibold text-orange-600">Dense Net</span>
+                            <span id="dense-acc" class="font-mono text-lg font-bold">0.0%</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-semibold text-blue-600">CNN</span>
+                            <span id="cnn-acc" class="font-mono text-lg font-bold">0.0%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-3 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                <h3 class="text-sm font-bold text-slate-400 uppercase mb-4">Convergence Curve</h3>
+                <div class="h-[350px]">
+                    <canvas id="accChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-12 p-6 bg-blue-50 rounded-xl border border-blue-100">
+            <h4 class="text-blue-800 font-bold mb-2 text-sm">Experimental Note</h4>
+            <p class="text-sm text-blue-700 leading-relaxed">
+                Check the <strong>Browser Console (F12)</strong> to see the loss values for each epoch. Even if accuracy is similar, notice how the CNN often achieves lower loss (higher confidence) more quickly.
+            </p>
+        </div>
+    </div>
+
+    <script type="module">
+        import {MnistData} from 'https://storage.googleapis.com/tfjs-tutorials/mnist_data.js';
+
+        let chart;
+        const epochs = 5;
+
+        function setupChart() {
+            const ctx = document.getElementById('accChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: epochs}, (_, i) => i + 1),
+                    datasets: [
+                        { label: 'Dense Network', borderColor: '#f97316', backgroundColor: '#f9731622', data: [], tension: 0.2, fill: true },
+                        { label: 'CNN', borderColor: '#2563eb', backgroundColor: '#2563eb22', data: [], tension: 0.2, fill: true }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: {
+                        y: { 
+                            min: 0, max: 1, 
+                            ticks: { callback: v => (v*100)+'%' },
+                            grid: { color: '#f1f5f9' }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        async function startTraining() {
+            const btn = document.getElementById('btn');
+            const status = document.getElementById('status');
+            btn.disabled = true;
+            
+            console.clear();
+            console.log("%c--- MNIST PERFORMANCE BENCHMARK ---", "font-weight: bold; font-size: 14px; color: #2563eb;");
+
+            const data = new MnistData();
+            await data.load();
+            const [trainXs, trainYs] = tf.tidy(() => {
+                const d = data.nextTrainBatch(2000);
+                return [d.xs, d.labels];
+            });
+
+            // Models
+            const denseModel = tf.sequential({ layers: [
+                tf.layers.dense({units: 64, activation: 'relu', inputShape: [784]}),
+                tf.layers.dense({units: 10, activation: 'softmax'})
+            ]});
+            denseModel.compile({optimizer: 'adam', loss: 'categoricalCrossentropy', metrics: ['accuracy']});
+
+            const cnnModel = tf.sequential({ layers: [
+                tf.layers.conv2d({inputShape: [28,28,1], kernelSize: 3, filters: 8, activation: 'relu'}),
+                tf.layers.maxPooling2d({poolSize: [2, 2]}),
+                tf.layers.flatten(),
+                tf.layers.dense({units: 10, activation: 'softmax'})
+            ]});
+            cnnModel.compile({optimizer: 'adam', loss: 'categoricalCrossentropy', metrics: ['accuracy']});
+
+            // Train Dense
+            status.innerText = "Training Dense...";
+            await denseModel.fit(trainXs, trainYs, {
+                epochs: epochs,
+                callbacks: {
+                    onEpochEnd: (e, logs) => {
+                        chart.data.datasets[0].data.push(logs.acc);
+                        chart.update();
+                        document.getElementById('dense-acc').innerText = (logs.acc * 100).toFixed(1) + "%";
+                        console.log(`%cDense Epoch ${e+1}: Acc=${logs.acc.toFixed(4)}`, "color: #f97316");
+                    }
+                }
+            });
+
+            // Train CNN
+            status.innerText = "Training CNN...";
+            const trainXsCNN = trainXs.reshape([2000, 28, 28, 1]);
+            await cnnModel.fit(trainXsCNN, trainYs, {
+                epochs: epochs,
+                callbacks: {
+                    onEpochEnd: (e, logs) => {
+                        chart.data.datasets[1].data.push(logs.acc);
+                        chart.update();
+                        document.getElementById('cnn-acc').innerText = (logs.acc * 100).toFixed(1) + "%";
+                        console.log(`%cCNN Epoch ${e+1}: Acc=${logs.acc.toFixed(4)}`, "color: #2563eb");
+                    }
+                }
+            });
+
+            status.innerText = "Benchmarking Complete.";
+            btn.disabled = false;
+        }
+
+        window.onload = setupChart;
+        window.startTraining = startTraining;
+    </script>
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pro Digit Lab</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        #canvas { cursor: crosshair; touch-action: none; background: black; }
+        .bar-transition { transition: width 0.3s ease-in-out; }
+    </style>
+</head>
+<body class="bg-white-900 text-slate-100 min-h-screen p-4 md:p-10 font-sans">
+
+    <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <div class="lg:col-span-1 bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl">
+            <h2 class="text-xl font-bold mb-4 flex items-center">
+                <span class="bg-blue-500 w-3 h-3 rounded-full mr-2"></span> Input Canvas
+            </h2>
+            <div class="flex justify-center mb-6">
+                <canvas id="canvas" width="280" height="280" class="rounded-lg border-2 border-slate-600"></canvas>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="clearCanvas()" class="py-3 bg-slate-700 hover:bg-slate-600 rounded-xl font-bold transition">Clear</button>
+                <button onclick="predict()" id="predictBtn" disabled class="py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold transition disabled:opacity-50">Classify</button>
+            </div>
+            <div id="status" class="mt-4 text-xs text-slate-400 font-mono italic text-center">Initializing...</div>
+        </div>
+
+        <div class="lg:col-span-1 bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl">
+            <h2 class="text-xl font-bold mb-4 flex items-center">
+                <span class="bg-emerald-500 w-3 h-3 rounded-full mr-2"></span> Preprocessing
+            </h2>
+            <p class="text-sm text-slate-400 mb-4">This is what the model "sees" (28x28 grayscale):</p>
+            <div class="flex justify-center bg-black p-4 rounded-lg border border-slate-600">
+                <canvas id="preview" width="28" height="28" class="w-40 h-40 image-render-pixelated"></canvas>
+            </div>
+            <div class="mt-6 space-y-2 text-xs font-mono text-slate-400">
+                <div class="flex justify-between"><span>Original:</span> <span>280x280 (RGB)</span></div>
+                <div class="flex justify-between"><span>Processed:</span> <span>28x28 (Float32)</span></div>
+                <div class="flex justify-between"><span>Normalization:</span> <span>0.0 - 1.0</span></div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-1 bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl">
+            <h2 class="text-xl font-bold mb-4 flex items-center">
+                <span class="bg-purple-500 w-3 h-3 rounded-full mr-2"></span> Prediction
+            </h2>
+            <div class="text-center py-4 bg-slate-900 rounded-xl mb-6">
+                <div id="result-val" class="text-8xl font-black text-white">?</div>
+                <div id="confidence" class="text-emerald-400 font-bold mt-2">--%</div>
+            </div>
+            
+            <h3 class="text-xs font-bold text-slate-500 uppercase mb-3">Class Probabilities</h3>
+            <div id="prob-bars" class="space-y-2">
+                </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import {MnistData} from 'https://storage.googleapis.com/tfjs-tutorials/mnist_data.js';
+
+        let model, canvas, ctx, previewCanvas, previewCtx, isDrawing = false;
+
+        async function init() {
+            const data = new MnistData();
+            await data.load();
+
+            model = tf.sequential();
+            model.add(tf.layers.conv2d({inputShape: [28, 28, 1], kernelSize: 3, filters: 8, activation: 'relu'}));
+            model.add(tf.layers.maxPooling2d({poolSize: [2, 2]}));
+            model.add(tf.layers.flatten());
+            model.add(tf.layers.dense({units: 10, activation: 'softmax'}));
+            model.compile({optimizer: 'adam', loss: 'categoricalCrossentropy', metrics: ['accuracy']});
+
+            const [trainXs, trainYs] = tf.tidy(() => {
+                const d = data.nextTrainBatch(2000);
+                return [d.xs.reshape([2000, 28, 28, 1]), d.labels];
+            });
+
+            await model.fit(trainXs, trainYs, {epochs: 5});
+            
+            document.getElementById('status').innerText = "SYSTEM ONLINE";
+            document.getElementById('predictBtn').disabled = false;
+            generateBars();
+        }
+
+        function generateBars() {
+            const container = document.getElementById('prob-bars');
+            container.innerHTML = '';
+            for(let i=0; i<10; i++) {
+                container.innerHTML += `
+                    <div class="flex items-center text-xs">
+                        <span class="w-4 font-mono">${i}</span>
+                        <div class="flex-1 h-2 bg-slate-700 rounded-full mx-2 overflow-hidden">
+                            <div id="bar-${i}" class="h-full bg-blue-500 bar-transition" style="width: 0%"></div>
+                        </div>
+                    </div>`;
+            }
+        }
+
+        window.onload = () => {
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
+            previewCanvas = document.getElementById('preview');
+            previewCtx = previewCanvas.getContext('2d');
+            
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 18;
+            ctx.lineCap = "round";
+
+            const draw = (e) => {
+                if (!isDrawing) return;
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX || e.touches[0].clientX) - rect.left;
+                const y = (e.clientY || e.touches[0].clientY) - rect.top;
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            };
+
+            canvas.onmousedown = (e) => { isDrawing = true; draw(e); };
+            canvas.onmousemove = draw;
+            window.onmouseup = () => { isDrawing = false; ctx.beginPath(); };
+            
+            init();
+        };
+
+        window.clearCanvas = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            previewCtx.clearRect(0, 0, 28, 28);
+        };
+
+        window.predict = async () => {
+            const tensor = tf.tidy(() => {
+                const raw = tf.browser.fromPixels(canvas)
+                    .resizeNearestNeighbor([28, 28])
+                    .mean(2)
+                    .expandDims(2);
+                
+                // Show in preview
+                const previewTensor = raw.div(255.0);
+                tf.browser.toPixels(previewTensor, previewCanvas);
+
+                return previewTensor.expandDims(0);
+            });
+
+            const prediction = model.predict(tensor);
+            const probs = await prediction.data();
+            const result = prediction.argMax(-1).dataSync()[0];
+
+            document.getElementById('result-val').innerText = result;
+            document.getElementById('confidence').innerText = (probs[result] * 100).toFixed(1) + "% Confidence";
+
+            probs.forEach((p, i) => {
+                const bar = document.getElementById(`bar-${i}`);
+                bar.style.width = (p * 100) + "%";
+                bar.style.backgroundColor = i === result ? "#22c55e" : "#3b82f6";
+            });
+
+            console.log("Probabilities:", probs);
+        };
+    </script>
+</body>
+</html>

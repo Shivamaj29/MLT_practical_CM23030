@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Basic TensorFlow.js Lab</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        .info-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-left: 5px solid #4CAF50;
+        }
+        h1 { color: #2c3e50; }
+        code { background: #eee; padding: 2px 5px; border-radius: 3px; }
+        .footer { margin-top: 20px; font-size: 0.9em; color: #666; }
+    </style>
+</head>
+<body>
+
+    <div class="info-card">
+        <h1>Tensor Basics</h1>
+        <p>1. Open your browser <strong>Console</strong> (Press <code>F12</code> or <code>Right-Click > Inspect</code>).</p>
+        <p>2. Refresh the page to see the code execute.</p>
+        <hr>
+        <p><strong>Operations covered:</strong></p>
+        <ul>
+            <li>Creation (Scalar, Vector, Matrix)</li>
+            <li>Element-wise Addition & Multiplication</li>
+            <li>Reshaping & Flattening</li>
+        </ul>
+    </div>
+
+    <script>
+        // All code runs after the page loads
+        window.onload = () => {
+            console.log("%c--- 1. CREATION ---", "color: blue; font-weight: bold;");
+            
+            const scalar = tf.scalar(5);
+            const vector = tf.tensor1d([1, 2, 3]);
+            const matrix = tf.tensor2d([[1, 2], [3, 4]]);
+
+            console.log("Scalar (0D):"); scalar.print();
+            console.log("Vector (1D):"); vector.print();
+            console.log("Matrix (2D):"); matrix.print();
+
+            console.log("%c--- 2. MATH OPERATIONS ---", "color: green; font-weight: bold;");
+            
+            const a = tf.tensor1d([10, 20, 30]);
+            const b = tf.tensor1d([2, 2, 2]);
+
+            console.log("Vector A + B:");
+            tf.add(a, b).print();
+
+            console.log("Vector A * B (Element-wise):");
+            tf.mul(a, b).print();
+
+            console.log("%c--- 3. RESHAPE vs FLATTEN ---", "color: orange; font-weight: bold;");
+            
+            const data = tf.tensor1d([1, 2, 3, 4, 5, 6]);
+            
+            // Reshape changes the structure (e.g., to 2 rows, 3 columns)
+            const reshaped = data.reshape([2, 3]);
+            console.log("Reshaped to 2x3 Matrix:");
+            reshaped.print();
+
+            // Flatten turns any multi-dimensional tensor back into a 1D line
+            const flattened = reshaped.flatten();
+            console.log("Flattened back to Vector:");
+            flattened.print();
+
+            console.log("%cCheck finished!", "color: gray;");
+        };
+    </script>
+</body>
+</html>

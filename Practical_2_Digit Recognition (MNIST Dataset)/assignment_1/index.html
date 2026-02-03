@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MNIST CNN Trainer</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-vis"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-white-900 text-gray-100 p-8 font-sans">
+
+    <div class="max-w-4xl mx-auto">
+        <header class="mb-8 border-b border-gray-700 pb-4">
+            <h1 class="text-3xl font-bold text-blue-400">MNIST CNN Training Lab</h1>
+            <p class="text-gray-400">Classifying handwritten digits (0-9) using Convolutional Layers.</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white-800 p-6 rounded-xl border border-gray-700 text-black">
+                <h2 class="text-xl font-semibold mb-4 text-black">Training Status</h2>
+                <button onclick="train()" id="trainBtn" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-bold transition mb-4">
+                    Start 5 Epochs
+                </button>
+                <div id="status" class="text-sm font-mono text-blue-300">Idle...</div>
+            </div>
+
+            <div class="md:col-span-2 bg-gray-800 p-6 rounded-xl border border-gray-700">
+                <h2 class="text-xl font-semibold mb-4 text-white">Live Metrics</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <span class="block text-xs text-gray-500 uppercase">Loss</span>
+                        <span id="lossVal" class="text-2xl font-mono">0.000</span>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <span class="block text-xs text-gray-500 uppercase">Accuracy</span>
+                        <span id="accVal" class="text-2xl font-mono text-green-400">0%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <p class="mt-6 text-xs text-gray-500 italic">Note: The first run will download ~11MB of MNIST data. Check the browser console for layer details.</p>
+    </div>
+
+    <script type="module">
+        // Import MNIST data helper
+        import {MnistData} from 'https://storage.googleapis.com/tfjs-tutorials/mnist_data.js';
+
+        async function train() {
+            const status = document.getElementById('status');
+            const trainBtn = document.getElementById('trainBtn');
+            trainBtn.disabled = true;
+
+            // 1. Load Data
+            status.innerText = "Downloading MNIST data...";
+            const data = new MnistData();
+            await data.load();
+
+            // 2. Build Model
+            const model = tf.sequential();
+            
+            // First Convolutional Layer
+            model.add(tf.layers.conv2d({
+                inputShape: [28, 28, 1],
+                kernelSize: 3,
+                filters: 8,
+                activation: 'relu'
+            }));
+            model.add(tf.layers.maxPooling2d({poolSize: [2, 2]}));
+
+            // Flatten and Dense Layers
+            model.add(tf.layers.flatten());
+            model.add(tf.layers.dense({units: 10, activation: 'softmax'}));
+
+            model.compile({
+                optimizer: tf.train.adam(),
+                loss: 'categoricalCrossentropy',
+                metrics: ['accuracy']
+            });
+
+            console.log("%cModel Architecture:", "color: #3b82f6; font-weight: bold;");
+            model.summary();
+
+            // 3. Prepare Training Data
+            const [trainXs, trainYs] = tf.tidy(() => {
+                const d = data.nextTrainBatch(1000);
+                return [
+                    d.xs.reshape([1000, 28, 28, 1]),
+                    d.labels
+                ];
+            });
+
+            // 4. Train
+            status.innerText = "Training model (5 Epochs)...";
+            console.log("Training started...");
+
+            await model.fit(trainXs, trainYs, {
+                epochs: 5,
+                callbacks: {
+                    onEpochEnd: (epoch, logs) => {
+                        document.getElementById('lossVal').innerText = logs.loss.toFixed(4);
+                        document.getElementById('accVal').innerText = (logs.acc * 100).toFixed(2) + "%";
+                        console.log(`Epoch ${epoch + 1}: Loss = ${logs.loss.toFixed(4)} | Acc = ${logs.acc.toFixed(4)}`);
+                    }
+                }
+            });
+
+            status.innerText = "Training Complete!";
+            trainBtn.disabled = false;
+        }
+
+        window.train = train;
+    </script>
+</body>
+</html>
